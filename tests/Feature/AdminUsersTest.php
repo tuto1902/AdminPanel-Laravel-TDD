@@ -24,6 +24,7 @@ class AdminUsersTest extends TestCase
         parent::setUp();
         
         $this->user = factory(User::class)->make();
+        $this->actingAs($this->user);
         $this->menuItems = factory(MenuItem::class, 3)->create();
         $this->data = [
             'name' => 'Test User',
@@ -50,7 +51,7 @@ class AdminUsersTest extends TestCase
      */
     public function can_create_user()
     {
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertRedirect('/users');
         $response->assertSessionHas('success');
@@ -69,7 +70,7 @@ class AdminUsersTest extends TestCase
         // Missing user name
         $this->data['name'] = null;
 
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -84,7 +85,7 @@ class AdminUsersTest extends TestCase
         // Missing email
         $this->data['email'] = null;
 
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -96,12 +97,12 @@ class AdminUsersTest extends TestCase
      */
     public function email_is_unique_for_store()
     {
-        $this->user->save();
+        $user = create('App\User');
         $this->menuItems = factory(MenuItem::class, 3)->create();
         // Dupe email
-        $this->data['email'] = $this->user->email;
+        $this->data['email'] = $user->email;
 
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -116,7 +117,7 @@ class AdminUsersTest extends TestCase
         // Missing password
         $this->data['password'] = null;
 
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -131,7 +132,7 @@ class AdminUsersTest extends TestCase
         // Mismatch password
         $this->data['password_confirmation'] = 'foo';
 
-        $response = $this->actingAs($this->user)->post('/users', $this->data);
+        $response = $this->post('/users', $this->data);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -143,10 +144,10 @@ class AdminUsersTest extends TestCase
      */
     public function can_update_user()
     {
-        $this->user->save();
-        $this->user->menuItems()->attach($this->menuItems->pluck('id')->toArray());
+        $user = create('App\User');
+        $user->menuItems()->attach($this->data['menu-items']);
 
-        $response = $this->actingAs($this->user)->put("/users/{$this->user->id}", $this->newData);
+        $response = $this->put("/users/{$user->id}", $this->newData);
 
         $response->assertRedirect('/users');
         $response->assertSessionHas('success');
@@ -162,12 +163,12 @@ class AdminUsersTest extends TestCase
      */
     public function user_name_is_required_for_update()
     {
-        $this->user->save();
-        $this->user->menuItems()->attach($this->menuItems->pluck('id')->toArray());
+        $user = create('App\User');
+        $user->menuItems()->attach($this->data['menu-items']);
         // Missing user name
         $this->newData['name'] = null;
 
-        $response = $this->actingAs($this->user)->put("/users/{$this->user->id}", $this->newData);
+        $response = $this->put("/users/{$user->id}", $this->newData);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -179,12 +180,12 @@ class AdminUsersTest extends TestCase
      */
     public function password_is_confirmed_for_update()
     {
-        $this->user->save();
-        $this->user->menuItems()->attach($this->menuItems->pluck('id')->toArray());
+        $user = create('App\User');
+        $user->menuItems()->attach($this->data['menu-items']);
         // Missing user name
         $this->newData['password_confirmation'] = 'foo';
 
-        $response = $this->actingAs($this->user)->put("/users/{$this->user->id}", $this->newData);
+        $response = $this->put("/users/{$user->id}", $this->newData);
 
         $response->assertStatus(302);
         $response->assertSessionHas('errors');
@@ -196,10 +197,10 @@ class AdminUsersTest extends TestCase
      */
     public function can_delete_user()
     {
-        $this->user->save();
-        $this->user->menuItems()->attach($this->menuItems->pluck('id')->toArray());
+        $user = Create('App\User');
+        $user->menuItems()->attach($this->data['menu-items']);
 
-        $response = $this->actingAs($this->user)->delete("/users/{$this->user->id}");
+        $response = $this->delete("/users/{$user->id}");
 
         $response->assertRedirect('/users');
         $response->assertSessionHas('success');
@@ -212,15 +213,13 @@ class AdminUsersTest extends TestCase
     /**
      * @test
      */
-    public function user_list()
+    public function it_can_display_all_users()
     {
-        $this->user->save();
+        $user = create('App\User');
 
-        $response = $this->actingAs($this->user)->get('/users');
+        $response = $this->get('/users');
 
-        $response->assertSee(htmlentities($this->user->name), ENT_QUOTES);
-        $response->assertSee(htmlentities($this->user->email), ENT_QUOTES);
-        $response->assertViewHas('users');
+        $response->assertSee($user->email);
     }
 
     /**
@@ -228,7 +227,7 @@ class AdminUsersTest extends TestCase
      */
     public function user_create()
     {
-        $response = $this->actingAs($this->user)->get('/users/create');
+        $response = $this->get('/users/create');
 
         $response->assertViewHas('menuItems');
         $response->assertSee('Create User');
@@ -239,17 +238,16 @@ class AdminUsersTest extends TestCase
      */
     public function user_edit()
     {
-        $this->user->save();
-        $this->user->menuItems()->attach($this->newData['menu-items']);
+        $user = create('App\User');
+        $user->menuItems()->attach($this->newData['menu-items']);
 
-        $response = $this->actingAs($this->user)->get("/users/{$this->user->id}/edit");
+        $response = $this->get("/users/{$user->id}/edit");
 
         $response->assertViewHas('user');
         $response->assertViewHas('menuItems');
         $response->assertViewHas('userMenuItems');
         $response->assertSee('Update User');
 
-        $response->assertSee(htmlentities($this->user->name, ENT_QUOTES));
         $response->assertSee("<option value=\"{$this->newData['menu-items'][0]}\" selected>");
         $response->assertSee("<option value=\"{$this->newData['menu-items'][1]}\" selected>");
     }
