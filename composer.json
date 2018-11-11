@@ -23,6 +23,9 @@
             "Tests\\": "tests/"
         }
     },
+    "autoload-dev": {
+        "files": ["tests/Helpers/functions.php"]
+    },
     "scripts": {
         "post-root-package-install": [
             "php -r \"file_exists('.env') || copy('.env.example', '.env');\""
